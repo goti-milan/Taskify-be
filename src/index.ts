@@ -1,13 +1,13 @@
 // Load environment variables
-require('dotenv').config();
+require("dotenv").config();
 
 import { PORT } from "./config";
 import { Request, Response } from "express";
 import { initializeDatabase } from "./config/db";
 import { authRoutes, taskRoutes } from "./routers";
-import cors from 'cors';
-import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
+import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 
 const express = require("express");
 
@@ -16,22 +16,31 @@ const app = express();
 // Security middleware
 app.use(helmet());
 
+const allowedOrigins = [
+  "https://taskify-fe-beryl.vercel.app/",
+  "http://localhost:5173",
+];
+
 // CORS configuration
-app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: allowedOrigins,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+  })
+);
 
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.',
+  message: "Too many requests from this IP, please try again later.",
 });
-app.use('/api/', limiter);
+app.use("/api/", limiter);
 
 // Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
@@ -44,7 +53,10 @@ app.use("/api/tasks", taskRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {
-  res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Route not found' } });
+  res.status(404).json({
+    success: false,
+    error: { code: "NOT_FOUND", message: "Route not found" },
+  });
 });
 
 // Global error handler
@@ -53,9 +65,9 @@ app.use((err: any, req: Request, res: Response, next: any) => {
   res.status(500).json({
     success: false,
     error: {
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'Something went wrong!'
-    }
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Something went wrong!",
+    },
   });
 });
 

@@ -33,6 +33,6 @@ export const authenticateToken = async (
 
     next();
   } catch (error) {
-    errorResponse(res, 403, 'FORBIDDEN', 'Invalid or expired token');
+    errorResponse(res, 401, 'FORBIDDEN', 'Invalid or expired token');
   }
 };
