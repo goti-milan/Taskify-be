@@ -1,81 +1,121 @@
-// Load environment variables
-require("dotenv").config();
+// ================================
+// Load env
+// ================================
+import "dotenv/config";
+
+// ================================
+// Imports
+// ================================
+import express, { Request, Response, NextFunction } from "express";
+import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 
 import { PORT } from "./config";
-import { Request, Response } from "express";
 import { initializeDatabase } from "./config/db";
 import { authRoutes, taskRoutes } from "./routers";
 
-import helmet from "helmet";
-import rateLimit from "express-rate-limit";
-import cors from 'cors';
-
-const express = require("express");
-
+// ================================
+// App init
+// ================================
 const app = express();
 
-app.use(cors({
-    origin: true,
-    credentials: true,
-}));
-app.options("*", cors());
-// Security middleware
-app.use(helmet());
+// ================================
+// 🚨 CORS — MVP MODE (ALLOW ALL)
+// MUST BE FIRST
+// ================================
+app.use(
+  cors({
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 
-
-
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: "Too many requests from this IP, please try again later.",
+// Explicit preflight support (CRITICAL for Railway)
+app.options("*", (_req, res) => {
+  res.sendStatus(204);
 });
 
-// Body parsing middleware
+// ================================
+// Security (disable cross-origin blockers)
+// ================================
+app.use(
+  helmet({
+    crossOriginResourcePolicy: false,
+    crossOriginEmbedderPolicy: false,
+  })
+);
+
+// ================================
+// Body parsers
+// ================================
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-app.use("/api/", limiter);
-// Routes
-app.get("/", (req: Request, res: Response) => {
-  res.status(200).json("Express server is running 🚀");
+// ================================
+// Rate limit (AFTER CORS)
+// ================================
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 
+app.use("/api", limiter);
+
+// ================================
+// Health check
+// ================================
+app.get("/", (_req: Request, res: Response) => {
+  res.status(200).json({ ok: true, message: "Server running 🚀" });
+});
+
+// ================================
+// Routes
+// ================================
 app.use("/api/auth", authRoutes);
 app.use("/api/tasks", taskRoutes);
 
-// 404 handler
-app.use((req: Request, res: Response) => {
+// ================================
+// 404
+// ================================
+app.use((_req: Request, res: Response) => {
   res.status(404).json({
     success: false,
     error: { code: "NOT_FOUND", message: "Route not found" },
   });
 });
 
+// ================================
 // Global error handler
-app.use((err: any, req: Request, res: Response, next: any) => {
-  console.error(err.stack);
-  res.status(500).json({
-    success: false,
-    error: {
-      code: "INTERNAL_SERVER_ERROR",
-      message: "Something went wrong!",
-    },
-  });
-});
+// ================================
+app.use(
+  (err: any, _req: Request, res: Response, _next: NextFunction) => {
+    console.error(err);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Something went wrong",
+      },
+    });
+  }
+);
 
-// Initialize database and start server
+// ================================
+// Start server
+// ================================
 const startServer = async () => {
   try {
-    // Initialize database connection
     await initializeDatabase();
 
-    // Start server
     app.listen(PORT, () => {
-      console.log(`Server running on http://localhost:${PORT}`);
+      console.log(`✅ Server running on port ${PORT}`);
     });
   } catch (error) {
-    console.error("Failed to start server:", error);
+    console.error("❌ Failed to start server", error);
     process.exit(1);
   }
 };
