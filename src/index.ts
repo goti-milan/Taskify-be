@@ -5,7 +5,7 @@ import { PORT } from "./config";
 import { Request, Response } from "express";
 import { initializeDatabase } from "./config/db";
 import { authRoutes, taskRoutes } from "./routers";
-import cors from "cors";
+
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 
@@ -16,20 +16,7 @@ const app = express();
 // Security middleware
 app.use(helmet());
 
-const allowedOrigins = [
-  "https://taskify-fe-beryl.vercel.app/",
-  "http://localhost:5173",
-];
 
-// CORS configuration
-app.use(
-  cors({
-    origin: allowedOrigins,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true,
-  })
-);
 
 // Rate limiting
 const limiter = rateLimit({
