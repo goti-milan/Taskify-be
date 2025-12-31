@@ -1,11 +1,5 @@
-// ================================
-// Load env
-// ================================
 import "dotenv/config";
 
-// ================================
-// Imports
-// ================================
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -15,31 +9,40 @@ import { PORT } from "./config";
 import { initializeDatabase } from "./config/db";
 import { authRoutes, taskRoutes } from "./routers";
 
-// ================================
-// App init
-// ================================
 const app = express();
 
-// ================================
-// 🚨 CORS — MVP MODE (ALLOW ALL)
-// MUST BE FIRST
-// ================================
+/* ============================
+   ✅ CORS (NO WILDCARDS + NO HANG)
+============================ */
+const ALLOWED_ORIGINS = [
+  "https://taskify-beta-seven.vercel.app",
+  "http://localhost:3000",
+  "http://localhost:5173",
+];
+
 app.use(
   cors({
-    origin: "*",
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    origin(origin, callback) {
+      if (!origin) return callback(null, true);
+      if (ALLOWED_ORIGINS.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error("CORS blocked"));
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
-// Explicit preflight support (CRITICAL for Railway)
+/* ✅ SAFE preflight handler (NO cors() here) */
 app.options("*", (_req, res) => {
   res.sendStatus(204);
 });
 
-// ================================
-// Security (disable cross-origin blockers)
-// ================================
+/* ============================
+   Security (safe config)
+============================ */
 app.use(
   helmet({
     crossOriginResourcePolicy: false,
@@ -47,75 +50,60 @@ app.use(
   })
 );
 
-// ================================
-// Body parsers
-// ================================
+/* ============================
+   Body parsers
+============================ */
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-// ================================
-// Rate limit (AFTER CORS)
-// ================================
+/* ============================
+   Rate limit (AFTER OPTIONS)
+============================ */
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
-  standardHeaders: true,
-  legacyHeaders: false,
 });
 
 app.use("/api", limiter);
 
-// ================================
-// Health check
-// ================================
+/* ============================
+   Routes
+============================ */
 app.get("/", (_req: Request, res: Response) => {
-  res.status(200).json({ ok: true, message: "Server running 🚀" });
+  res.json({ ok: true });
 });
 
-// ================================
-// Routes
-// ================================
 app.use("/api/auth", authRoutes);
 app.use("/api/tasks", taskRoutes);
 
-// ================================
-// 404
-// ================================
-app.use((_req: Request, res: Response) => {
-  res.status(404).json({
-    success: false,
-    error: { code: "NOT_FOUND", message: "Route not found" },
-  });
+/* ============================
+   404
+============================ */
+app.use((_req, res) => {
+  res.status(404).json({ error: "Not found" });
 });
 
-// ================================
-// Global error handler
-// ================================
+/* ============================
+   Error handler
+============================ */
 app.use(
   (err: any, _req: Request, res: Response, _next: NextFunction) => {
     console.error(err);
-    res.status(500).json({
-      success: false,
-      error: {
-        code: "INTERNAL_SERVER_ERROR",
-        message: "Something went wrong",
-      },
-    });
+    res.status(500).json({ error: "Server error" });
   }
 );
 
-// ================================
-// Start server
-// ================================
+/* ============================
+   Start server
+============================ */
 const startServer = async () => {
   try {
     await initializeDatabase();
-
-    app.listen(PORT, () => {
-      console.log(`✅ Server running on port ${PORT}`);
-    });
-  } catch (error) {
-    console.error("❌ Failed to start server", error);
+    app.listen(PORT, () =>
+      console.log(`✅ Server running on port ${PORT}`)
+    );
+  } catch (err) {
+    console.error("❌ Startup failed", err);
     process.exit(1);
   }
 };
