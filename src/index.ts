@@ -1,3 +1,4 @@
+// src/index.ts
 import "dotenv/config";
 
 import express, { Request, Response, NextFunction } from "express";
@@ -12,7 +13,7 @@ import { authRoutes, taskRoutes } from "./routers";
 const app = express();
 
 /* ============================
-   ✅ CORS (NO WILDCARDS + NO HANG)
+   ✅ Allowed origins for CORS
 ============================ */
 const ALLOWED_ORIGINS = [
   "https://taskify-beta-seven.vercel.app",
@@ -20,28 +21,42 @@ const ALLOWED_ORIGINS = [
   "http://localhost:5173",
 ];
 
+/* ============================
+   ✅ Global CORS Middleware
+   Handles preflight OPTIONS automatically
+============================ */
 app.use(
   cors({
-    origin(origin, callback) {
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like Postman)
       if (!origin) return callback(null, true);
+
       if (ALLOWED_ORIGINS.includes(origin)) {
         return callback(null, true);
       }
+
       return callback(new Error("CORS blocked"));
     },
     credentials: true,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
-/* ✅ SAFE preflight handler (NO cors() here) */
-app.options("*", (_req, res) => {
-  res.sendStatus(204);
+/* ============================
+   ✅ Optional explicit OPTIONS handler
+   (safe fallback, avoids path-to-regexp issues)
+============================ */
+app.use((req: Request, res: Response, next: NextFunction): void => {
+  if (req.method === "OPTIONS") {
+    res.sendStatus(204);
+    return;
+  }
+  next();
 });
 
 /* ============================
-   Security (safe config)
+   ✅ Security (Helmet)
 ============================ */
 app.use(
   helmet({
@@ -51,23 +66,22 @@ app.use(
 );
 
 /* ============================
-   Body parsers
+   ✅ Body parsers
 ============================ */
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 /* ============================
-   Rate limit (AFTER OPTIONS)
+   ✅ Rate limiter
 ============================ */
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
+  windowMs: 15 * 60 * 1000, // 15 min
+  max: 100, // limit each IP
 });
-
 app.use("/api", limiter);
 
 /* ============================
-   Routes
+   ✅ Routes
 ============================ */
 app.get("/", (_req: Request, res: Response) => {
   res.json({ ok: true });
@@ -77,29 +91,29 @@ app.use("/api/auth", authRoutes);
 app.use("/api/tasks", taskRoutes);
 
 /* ============================
-   404
+   ✅ 404 handler
 ============================ */
-app.use((_req, res) => {
+app.use((_req: Request, res: Response) => {
   res.status(404).json({ error: "Not found" });
 });
 
 /* ============================
-   Error handler
+   ✅ Error handler
 ============================ */
 app.use(
   (err: any, _req: Request, res: Response, _next: NextFunction) => {
     console.error(err);
-    res.status(500).json({ error: "Server error" });
+    res.status(500).json({ error: err.message || "Server error" });
   }
 );
 
 /* ============================
-   Start server
+   ✅ Start server
 ============================ */
 const startServer = async () => {
   try {
     await initializeDatabase();
-    app.listen(PORT, () =>
+    app.listen(PORT, "0.0.0.0", () =>
       console.log(`✅ Server running on port ${PORT}`)
     );
   } catch (err) {
