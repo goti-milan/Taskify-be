@@ -7,7 +7,8 @@ const SALT_ROUNDS = 12;
 
 export const createUser = async (userData: UserCreationAttributes): Promise<UserResponse> => {
   // Check if user already exists
-  const existingUser = await UserModel.findOne({ where: { email: userData.email } });
+  const normalizedEmail = userData.email.toLowerCase().trim();
+  const existingUser = await UserModel.findOne({ where: { email: normalizedEmail } });
   if (existingUser) {
     throw new Error('User with this email already exists');
   }
@@ -17,6 +18,7 @@ export const createUser = async (userData: UserCreationAttributes): Promise<User
 
   const userDataWithHashedPassword: UserCreationAttributes = {
     ...userData,
+     email: normalizedEmail,
     password: hashedPassword
   };
 
